@@ -164,6 +164,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .crash_gthreshold = 400,    // degrees/second
         .crash_setpoint_threshold = 350, // degrees/second
         .crash_recovery = PID_CRASH_RECOVERY_OFF, // off by default
+        .crash_relax = CRASH_RELAX_CUTOFF_DEFAULT,
         .horizon_tilt_effect = 75,
         .horizon_tilt_expert_mode = false,
         .crash_limit_yaw = 200,
@@ -315,6 +316,9 @@ static FAST_RAM_ZERO_INIT pt1Filter_t antiGravityThrottleLpf;
 
 static FAST_RAM_ZERO_INIT float ffBoostFactor;
 static FAST_RAM_ZERO_INIT float ffSpikeLimitInverse;
+static FAST_RAM_ZERO_INIT pt1Filter_t crashRelaxPt1[XYZ_AXIS_COUNT];
+static FAST_RAM_ZERO_INIT float crashRelaxSetpointThreshold;
+
 
 float pidGetSpikeLimitInverse()
 {
@@ -467,6 +471,9 @@ void pidInitFilters(const pidProfile_t *pidProfile)
 
     ffBoostFactor = (float)pidProfile->ff_boost / 10.0f;
     ffSpikeLimitInverse = pidProfile->ff_spike_limit ? 1.0f / ((float)pidProfile->ff_spike_limit / 10.0f) : 0.0f;
+    for (int axis = FD_ROLL; axis <= FD_YAW; axis++) {
+        pt1FilterInit(&crashRelaxPt1[axis], pt1FilterGain((float)pidProfile->crash_relax, dT));
+    }
 }
 
 #ifdef USE_RC_SMOOTHING_FILTER
@@ -659,6 +666,8 @@ void pidInitConfig(const pidProfile_t *pidProfile)
     // adapt setpoint threshold to user changes from default cutoff value
     itermRelaxSetpointThreshold = ITERM_RELAX_SETPOINT_THRESHOLD * ITERM_RELAX_CUTOFF_DEFAULT / itermRelaxCutoff;
 #endif
+
+    crashRelaxSetpointThreshold = CRASH_RELAX_SETPOINT_THRESHOLD * CRASH_RELAX_CUTOFF_DEFAULT / pidProfile->crash_relax;
 
 #ifdef USE_ACRO_TRAINER
     acroTrainerAngleLimit = pidProfile->acro_trainer_angle_limit;
@@ -919,9 +928,15 @@ static void detectAndSetCrashRecovery(
     // no point in trying to recover if the crash is so severe that the gyro overflows
     if ((crash_recovery || FLIGHT_MODE(GPS_RESCUE_MODE)) && !gyroOverflowDetected()) {
         if (ARMING_FLAG(ARMED)) {
-            if (getMotorMixRange() >= 1.0f && !inCrashRecoveryMode
-                && fabsf(delta) > crashDtermThreshold
-                && fabsf(errorRate) > crashGyroThreshold
+            float sp = getSetpointRate(axis);
+            float setpointHpf = fabsf(sp - pt1FilterApply(&crashRelaxPt1[axis], sp));
+            float crashRelaxFactor = MAX(0, 1 - setpointHpf / crashRelaxSetpointThreshold);
+            if (axis == FD_YAW && fabsf(pidData[axis].I) == itermLimit) {
+                crashRelaxFactor = 0.0f;
+            }
+            if (!inCrashRecoveryMode
+                && crashRelaxFactor * fabsf(delta) > crashDtermThreshold
+                && crashRelaxFactor * fabsf(errorRate) > crashGyroThreshold
                 && fabsf(getSetpointRate(axis)) < crashSetpointThreshold) {
                 if (crash_recovery == PID_CRASH_RECOVERY_DISARM) {
                     setArmingDisabled(ARMING_DISABLED_CRASH_DETECTED);
