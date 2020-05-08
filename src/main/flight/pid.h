@@ -188,6 +188,14 @@ typedef struct pidProfile_s {
     uint8_t ff_interpolate_sp;              // Calculate FF from interpolated setpoint
     uint8_t ff_max_rate_limit;              // Maximum setpoint rate percentage for FF
     uint8_t ff_spike_limit;                 // FF stick extrapolation lookahead period in ms
+
+    uint8_t d_weight;						// d_term boost for the propwash band
+    uint8_t pb_low;							// propwash band low frequency
+    uint8_t pb_high;						// propwash band high frequency
+    // I_DECAY
+    uint8_t i_decay;						// i-term decay
+    uint16_t errorBoost;                    // the weight of the non linear boost
+    uint8_t errorBoostLimit;                // percentage of the error for the non linear pid boost
 } pidProfile_t;
 
 PG_DECLARE_ARRAY(pidProfile_t, PID_PROFILE_COUNT, pidProfiles);

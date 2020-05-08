@@ -73,6 +73,13 @@ static uint8_t rateProfileIndex;
 static char rateProfileIndexString[MAX_RATE_PROFILE_NAME_LENGTH + 5];
 static controlRateConfig_t rateProfile;
 
+static uint8_t d_weight;
+static uint8_t pb_low;
+static uint8_t pb_high;
+static uint16_t errorBoost;
+static uint8_t errorBoostLimit;
+static uint8_t i_decay;
+
 static const char * const osdTableThrottleLimitType[] = {
     "OFF", "SCALE", "CLIP"
 };
@@ -165,6 +172,12 @@ static long cmsx_PidRead(void)
         tempPid[i][2] = pidProfile->pid[i].D;
         tempPidF[i] = pidProfile->pid[i].F;
     }
+    d_weight = pidProfile->d_weight;
+    pb_low = pidProfile->pb_low;
+    pb_high = pidProfile->pb_high;
+    errorBoost = pidProfile->errorBoost;
+    errorBoostLimit = pidProfile->errorBoostLimit;
+    i_decay = pidProfile->i_decay;
 
     return 0;
 }
@@ -188,6 +201,12 @@ static long cmsx_PidWriteback(const OSD_Entry *self)
         pidProfile->pid[i].D = tempPid[i][2];
         pidProfile->pid[i].F = tempPidF[i];
     }
+    pidProfile->d_weight = d_weight;
+    pidProfile->pb_high = pb_high;
+    pidProfile->pb_low = pb_low;
+    errorBoost = pidProfile->errorBoost;
+    errorBoostLimit = pidProfile->errorBoostLimit;
+    i_decay = pidProfile->i_decay;
     pidInitConfig(currentPidProfile);
 
     return 0;
@@ -211,6 +230,14 @@ static const OSD_Entry cmsx_menuPidEntries[] =
     { "YAW   I", OME_UINT8, NULL, &(OSD_UINT8_t){ &tempPid[PID_YAW][1],   0, 200, 1 }, 0 },
     { "YAW   D", OME_UINT8, NULL, &(OSD_UINT8_t){ &tempPid[PID_YAW][2],   0, 200, 1 }, 0 },
     { "YAW   F", OME_UINT16, NULL, &(OSD_UINT16_t){ &tempPidF[PID_YAW],   0, 2000, 1 }, 0 },
+
+    { "D_WEIGHT", OME_UINT8, NULL, &(OSD_UINT8_t){ &d_weight,  0, 20, 1 },  0 },
+    { "PB_LOW",   OME_UINT8, NULL, &(OSD_UINT8_t){ &pb_low,  10, 30, 1 },  0 },
+    { "PB_HIGH",  OME_UINT8, NULL, &(OSD_UINT8_t){ &pb_high,  10, 50, 1 },  0 },
+
+	{ "NLPID BOOST", OME_UINT16, NULL, &(OSD_UINT16_t){ &errorBoost,      0,  100,  5}, 0 },
+    { "BOOST LIMIT", OME_UINT8, NULL, &(OSD_UINT8_t){ &errorBoostLimit,   0,  250,  1}, 0 },
+    { "I_DECAY", OME_UINT8, NULL, &(OSD_UINT8_t){ &i_decay,  1, 10, 1 },  0 },
 
     { "BACK", OME_Back, NULL, NULL, 0 },
     { NULL, OME_END, NULL, NULL, 0 }

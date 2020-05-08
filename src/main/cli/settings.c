@@ -967,6 +967,13 @@ const clivalue_t valueTable[] = {
     { "yaw_deadband",               VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_RC_CONTROLS_CONFIG, offsetof(rcControlsConfig_t, yaw_deadband) },
     { "yaw_control_reversed",       VAR_INT8   | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_RC_CONTROLS_CONFIG, offsetof(rcControlsConfig_t, yaw_control_reversed) },
 
+    { "i_decay",                    VAR_UINT8  | PROFILE_VALUE, .config.minmax = { 1, 10 },  PG_PID_PROFILE, offsetof(pidProfile_t, i_decay) },
+    { "nlpid_boost",                VAR_UINT16 | PROFILE_VALUE, .config.minmax = { 0, 100 }, PG_PID_PROFILE, offsetof(pidProfile_t, errorBoost) },
+    { "nlpid_boost_limit",          VAR_UINT8  | PROFILE_VALUE, .config.minmax = { 0, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, errorBoostLimit) },
+    { "d_weight",                   VAR_UINT8  | PROFILE_VALUE, .config.minmax = { 0, 20 }, PG_PID_PROFILE, offsetof(pidProfile_t, d_weight) },
+    { "pb_low",                     VAR_UINT8  | PROFILE_VALUE, .config.minmax = { 10, 30 },  PG_PID_PROFILE, offsetof(pidProfile_t, pb_low) },
+    { "pb_high",                    VAR_UINT8  | PROFILE_VALUE, .config.minmax = { 10, 50 },  PG_PID_PROFILE, offsetof(pidProfile_t, pb_high) },
+
 // PG_PID_CONFIG
     { "pid_process_denom",          VAR_UINT8  | MASTER_VALUE,  .config.minmaxUnsigned = { 1, MAX_PID_PROCESS_DENOM }, PG_PID_CONFIG, offsetof(pidConfig_t, pid_process_denom) },
 #ifdef USE_RUNAWAY_TAKEOFF

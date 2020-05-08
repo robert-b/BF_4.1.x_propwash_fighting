@@ -52,9 +52,9 @@
 #define USE_RC_SMOOTHING_FILTER
 #define USE_TPA_MODE
 #define USE_CCM_CODE
-#define USE_OVERCLOCK
+//#define USE_OVERCLOCK
 #define USE_INTERPOLATED_SP
-#define USE_ABSOLUTE_CONTROL
+//#define USE_ABSOLUTE_CONTROL
 #define USE_THROTTLE_BOOST
 #define USE_QUAD_MIXER_ONLY
 #define USE_VTX_TABLE
@@ -131,10 +131,10 @@
 #define USE_DSHOT_TELEMETRY_STATS
 #define USE_RPM_FILTER
 #define USE_DYN_IDLE
-#define I2C3_OVERCLOCK true
-#define I2C4_OVERCLOCK true
+//#define I2C3_OVERCLOCK true
+//#define I2C4_OVERCLOCK true
 #define USE_GYRO_DATA_ANALYSE
-#define USE_OVERCLOCK
+//#define USE_OVERCLOCK
 #define USE_ADC_INTERNAL
 #define USE_USB_CDC_HID
 #define USE_USB_MSC
@@ -155,7 +155,7 @@
 #define USE_DSHOT_TELEMETRY
 #define USE_DSHOT_TELEMETRY_STATS
 #define USE_RPM_FILTER
-#define USE_DYN_IDLE
+//#define USE_DYN_IDLE
 #define USE_GYRO_DATA_ANALYSE
 #define USE_ADC_INTERNAL
 #define USE_USB_CDC_HID
@@ -233,10 +233,10 @@
 #define USE_PPM
 
 #define USE_SERIALRX_CRSF       // Team Black Sheep Crossfire protocol
-#define USE_SERIALRX_IBUS       // FlySky and Turnigy receivers
+//#define USE_SERIALRX_IBUS       // FlySky and Turnigy receivers
 #define USE_SERIALRX_SBUS       // Frsky and Futaba receivers
-#define USE_SERIALRX_SPEKTRUM   // SRXL, DSM2 and DSMX protocol
-#define USE_SERIALRX_SUMD       // Graupner Hott protocol
+//#define USE_SERIALRX_SPEKTRUM   // SRXL, DSM2 and DSMX protocol
+//#define USE_SERIALRX_SUMD       // Graupner Hott protocol
 #endif
 
 #define USE_CLI
@@ -255,7 +255,7 @@
 
 #if (FLASH_SIZE > 64)
 #define USE_INTERPOLATED_SP
-#define USE_ABSOLUTE_CONTROL
+//#define USE_ABSOLUTE_CONTROL
 #define USE_THROTTLE_BOOST
 
 #define USE_BLACKBOX
@@ -287,7 +287,7 @@
 #define USE_CMS
 #define USE_MSP_DISPLAYPORT
 #define USE_MSP_OVER_TELEMETRY
-#define USE_LED_STRIP
+//#define USE_LED_STRIP
 #define USE_GYRO_LPF2
 #define USE_DYN_LPF
 #define USE_D_MIN
@@ -368,7 +368,7 @@
 #define USE_TELEMETRY_FRSKY_HUB
 #define USE_TELEMETRY_SMARTPORT
 
-#define USE_ACRO_TRAINER
+//#define USE_ACRO_TRAINER
 #define USE_AIRMODE_LPF
 #define USE_DASHBOARD
 #define USE_DSHOT_DMAR
@@ -389,7 +389,7 @@
 #define USE_TELEMETRY_MAVLINK
 #define USE_UNCOMMON_MIXERS
 #define USE_SIGNATURE
-#define USE_ABSOLUTE_CONTROL
+//#define USE_ABSOLUTE_CONTROL
 #define USE_HOTT_TEXTMODE
 #define USE_LED_STRIP_STATUS_MODE
 #define USE_VARIO

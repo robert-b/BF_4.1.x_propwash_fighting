@@ -31,6 +31,7 @@
 #include "common/axis.h"
 #include "common/filter.h"
 #include "common/maths.h"
+#include "common/ButterFilter.h"
 
 #include "config/config_reset.h"
 
@@ -132,6 +133,17 @@ static FAST_RAM_ZERO_INIT float airmodeThrottleOffsetLimit;
 
 PG_REGISTER_ARRAY_WITH_RESET_FN(pidProfile_t, PID_PROFILE_COUNT, pidProfiles, PG_PID_PROFILE, 13);
 
+static float       errorBoost      = 15.0f;
+static float       errorBoostLimit = 10.0f;
+static float       errorMultiplier = 1e-9f;
+
+float butteredPIDboost( float errorRate)
+{
+	const float boost = (errorRate * errorRate) * errorMultiplier;
+
+	return 1.0f + MIN(boost, errorBoostLimit);
+}
+
 void resetPidProfile(pidProfile_t *pidProfile)
 {
     RESET_CONFIG(pidProfile_t, pidProfile,
@@ -217,6 +229,12 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .ff_spike_limit = 60,
         .ff_max_rate_limit = 100,
         .ff_boost = 15,
+        .d_weight = 0,
+		.pb_low = 22,
+		.pb_high = 22,
+        .i_decay = 4,
+        .errorBoost = 30,
+        .errorBoostLimit = 20,
     );
 #ifndef USE_D_MIN
     pidProfile->pid[PID_ROLL].D = 30;
@@ -319,6 +337,7 @@ static FAST_RAM_ZERO_INIT float ffSpikeLimitInverse;
 static FAST_RAM_ZERO_INIT pt1Filter_t crashRelaxPt1[XYZ_AXIS_COUNT];
 static FAST_RAM_ZERO_INIT float crashRelaxSetpointThreshold;
 
+static float d_weight = 1.0f;
 
 float pidGetSpikeLimitInverse()
 {
@@ -343,6 +362,18 @@ void pidInitFilters(const pidProfile_t *pidProfile)
         ptermYawLowpassApplyFn = nullFilterApply;
         return;
     }
+//TODO move them to the flash area and expose them via cli
+#define LOW_PASSBAND_FREQUENCY	(17)
+#define HIGH_PASSBAND_FREQUENCY	(24)
+
+    errorBoost = (float) pidProfile->errorBoost;
+    errorBoostLimit = (float) pidProfile->errorBoostLimit;
+
+	errorMultiplier = errorBoost * errorBoost * 1e-9f;
+	errorBoostLimit = errorBoostLimit / 100.0f;
+
+	createBandPassFilter( pidProfile->pb_low,  pidProfile->pb_high,  pidFrequency);
+    d_weight = (float)pidProfile->d_weight / 100.0f;
 
     const uint32_t pidFrequencyNyquist = pidFrequency / 2; // No rounding needed
 
@@ -1453,8 +1484,22 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             // This is done to avoid DTerm spikes that occur with dynamically
             // calculated deltaT whenever another task causes the PID
             // loop execution to be delayed.
-            const float delta =
-                - (gyroRateDterm[axis] - previousGyroRateDterm[axis]) * pidFrequency;
+            float delta = - (gyroRateDterm[axis] - previousGyroRateDterm[axis]) * pidFrequency;
+            if (axis != FD_YAW)
+            {
+            	const float nonLinearBoost = butteredPIDboost(errorRate);
+            	delta *= nonLinearBoost;
+
+                const float d_boost = applyBandPassFilter(axis, delta);
+                if (d_weight > 0.0f)
+                {
+                    const float stickDeflection = getRcDeflectionAbs(axis);
+                    const float correction = 1.0f - fabsf(stickDeflection);
+
+                	delta += (d_boost * d_weight * correction);
+                }
+            }
+
 
 #if defined(USE_ACC)
             if (cmpTimeUs(currentTimeUs, levelModeStartTimeUs) > CRASH_RECOVERY_DETECTION_DELAY_US) {
