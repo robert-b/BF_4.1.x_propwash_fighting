@@ -137,9 +137,9 @@ static float       errorBoost      = 15.0f;
 static float       errorBoostLimit = 10.0f;
 static float       errorMultiplier = 1e-9f;
 
-float butteredPIDboost( float errorRate)
+float butteredPIDboost( float errorRate, float weight)
 {
-	const float boost = (errorRate * errorRate) * errorMultiplier;
+	const float boost = (errorRate * errorRate) * errorMultiplier * weight;
 
 	return 1.0f + MIN(boost, errorBoostLimit);
 }
@@ -1487,16 +1487,22 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             float delta = - (gyroRateDterm[axis] - previousGyroRateDterm[axis]) * pidFrequency;
             if (axis != FD_YAW)
             {
-            	const float nonLinearBoost = butteredPIDboost(errorRate);
+            	const float saveDelta = delta;
+                float deflection =  2.0f * getRcDeflectionAbs(axis);
+                if (deflection > 1.0f)
+                {
+                	deflection = 1.0f;
+                }
+                const float weight = 1.0f - deflection;
+
+                const float nonLinearBoost = butteredPIDboost(errorRate, weight);
             	delta *= nonLinearBoost;
 
-                const float d_boost = applyBandPassFilter(axis, delta);
+                const float d_boost = applyBandPassFilter(axis, savedDelta);
                 if (d_weight > 0.0f)
                 {
-                    const float stickDeflection = getRcDeflectionAbs(axis);
-                    const float correction = 1.0f - fabsf(stickDeflection);
 
-                	delta += (d_boost * d_weight * correction);
+                	delta += (d_boost * d_weight * weight);
                 }
             }
 
