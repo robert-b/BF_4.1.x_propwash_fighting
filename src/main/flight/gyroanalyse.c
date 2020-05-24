@@ -72,6 +72,19 @@ static uint16_t FAST_RAM_ZERO_INIT dynNotchMaxFFT;
 // Hanning window, see https://en.wikipedia.org/wiki/Window_function#Hann_.28Hanning.29_window
 static FAST_RAM_ZERO_INIT float hanningWindow[FFT_WINDOW_SIZE];
 
+static int savedFFTbin[3] = {0,};
+
+bool propwashFrequencyDetected(void)
+{
+	if (savedFFTbin[0] == 1 || savedFFTbin[1] == 1 || savedFFTbin[2] == 1 ||	/* 16 hz band */
+		savedFFTbin[0] == 2 || savedFFTbin[1] == 2 || savedFFTbin[2] == 2)	    /* 24 hz band */
+	{
+		return true;
+	}
+
+	return false;
+}
+
 void gyroDataAnalyseInit(uint32_t targetLooptimeUs)
 {
 #ifdef USE_MULTI_GYRO
@@ -93,26 +106,27 @@ void gyroDataAnalyseInit(uint32_t targetLooptimeUs)
         dualNotch = false;
     }
 
-    if (dynamicFilterRange == DYN_NOTCH_RANGE_AUTO) {
-        if (gyroConfig()->dyn_lpf_gyro_max_hz > 333) {
-            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_MEDIUM;
-        }
-        if (gyroConfig()->dyn_lpf_gyro_max_hz > 610) {
-            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_HIGH;
-        }
-    } else {
-        if (dynamicFilterRange == DYN_NOTCH_RANGE_HIGH) {
-            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_HIGH;
-        }
-        else if (dynamicFilterRange == DYN_NOTCH_RANGE_MEDIUM) {
-            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_MEDIUM;
-        }
-    }
+    // stick with 1khz sampling rate
+//    if (dynamicFilterRange == DYN_NOTCH_RANGE_AUTO) {
+//        if (gyroConfig()->dyn_lpf_gyro_max_hz > 333) {
+//            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_MEDIUM;
+//        }
+//        if (gyroConfig()->dyn_lpf_gyro_max_hz > 610) {
+//            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_HIGH;
+//        }
+//    } else {
+//        if (dynamicFilterRange == DYN_NOTCH_RANGE_HIGH) {
+//            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_HIGH;
+//        }
+//        else if (dynamicFilterRange == DYN_NOTCH_RANGE_MEDIUM) {
+//            fftSamplingRateHz = DYN_NOTCH_RANGE_HZ_MEDIUM;
+//        }
+//    }
     // If we get at least 3 samples then use the default FFT sample frequency
     // otherwise we need to calculate a FFT sample frequency to ensure we get 3 samples (gyro loops < 4K)
     const int gyroLoopRateHz = lrintf((1.0f / targetLooptimeUs) * 1e6f);
     
-    fftSamplingRateHz = MIN((gyroLoopRateHz / 3), fftSamplingRateHz);
+    //fftSamplingRateHz = MIN((gyroLoopRateHz / 3), fftSamplingRateHz);
 
     fftResolution = (float)fftSamplingRateHz / FFT_WINDOW_SIZE;
 
@@ -271,8 +285,8 @@ static FAST_CODE_NOINLINE void gyroDataAnalyseUpdate(gyroAnalyseState_t *state, 
         {
             bool fftIncreased = false;
             float dataMax = 0;
-            uint8_t binStart = 0;
-            uint8_t binMax = 0;
+            int binStart = 0;
+            int binMax = 0;
             //for bins after initial decline, identify start bin and max bin 
             for (int i = fftStartBin; i < FFT_BIN_COUNT; i++) {
                 if (fftIncreased || (state->fftData[i] > state->fftData[i - 1])) {
@@ -316,11 +330,13 @@ static FAST_CODE_NOINLINE void gyroDataAnalyseUpdate(gyroAnalyseState_t *state, 
              // idx was shifted by 1 to start at 1, not 0
             if (fftSum > 0) {
                 fftMeanIndex = (fftWeightedSum / fftSum) - 1;
+                savedFFTbin[state->updateAxis] = fftMeanIndex;
                 // the index points at the center frequency of each bin so index 0 is actually 16.125Hz
                 centerFreq = fftMeanIndex * fftResolution;
             } else {
                 centerFreq = state->prevCenterFreq[state->updateAxis];
-            }
+                fftMeanIndex = 0;
+             }
             centerFreq = fmax(centerFreq, dynNotchMinHz);
             centerFreq = biquadFilterApply(&state->detectedFrequencyFilter[state->updateAxis], centerFreq);
             state->prevCenterFreq[state->updateAxis] = state->centerFreq[state->updateAxis];

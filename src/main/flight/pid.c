@@ -133,15 +133,20 @@ static FAST_RAM_ZERO_INIT float airmodeThrottleOffsetLimit;
 
 PG_REGISTER_ARRAY_WITH_RESET_FN(pidProfile_t, PID_PROFILE_COUNT, pidProfiles, PG_PID_PROFILE, 13);
 
-static float       errorBoost      = 15.0f;
-static float       errorBoostLimit = 10.0f;
+static float       errorBoostLimit = 0.1f;
 static float       errorMultiplier = 1e-9f;
+
+#define SIGN(x) ((x > 0.0f) - (x < 0.0f))
 
 float butteredPIDboost( float errorRate, float weight)
 {
 	const float boost = (errorRate * errorRate) * errorMultiplier * weight;
-
-	return 1.0f + MIN(boost, errorBoostLimit);
+	if (weight > 0.0f)
+	{
+		if (boost < errorBoostLimit)
+			return boost * SIGN(errorRate);
+	}
+	return 0.0f;
 }
 
 void resetPidProfile(pidProfile_t *pidProfile)
@@ -230,11 +235,11 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .ff_max_rate_limit = 100,
         .ff_boost = 15,
         .d_weight = 0,
-		.pb_low = 22,
+		.pb_low = 20,
 		.pb_high = 22,
         .i_decay = 4,
-        .errorBoost = 30,
-        .errorBoostLimit = 20,
+        .errorBoost = 2,
+        .errorBoostLimit = 2,
     );
 #ifndef USE_D_MIN
     pidProfile->pid[PID_ROLL].D = 30;
@@ -366,11 +371,10 @@ void pidInitFilters(const pidProfile_t *pidProfile)
 #define LOW_PASSBAND_FREQUENCY	(17)
 #define HIGH_PASSBAND_FREQUENCY	(24)
 
-    errorBoost = (float) pidProfile->errorBoost;
-    errorBoostLimit = (float) pidProfile->errorBoostLimit;
+    float errorBoost = (float) pidProfile->errorBoost;
+    errorBoostLimit = (float) pidProfile->errorBoostLimit / 100.0f;
 
 	errorMultiplier = errorBoost * errorBoost * 1e-9f;
-	errorBoostLimit = errorBoostLimit / 100.0f;
 
 	createBandPassFilter( pidProfile->pb_low,  pidProfile->pb_high,  pidFrequency);
     d_weight = (float)pidProfile->d_weight / 100.0f;
@@ -1375,6 +1379,9 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
     }
 #endif
 
+    const float deflection  =  2.0f * MAX(getRcDeflectionAbs(FD_ROLL), getRcDeflectionAbs(FD_PITCH));
+    const float stickWeight = 1.0f - MIN(deflection, 1.0f);
+
     // ----------PID controller----------
     for (int axis = FD_ROLL; axis <= FD_YAW; ++axis) {
 
@@ -1416,6 +1423,11 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         // -----calculate error rate
         const float gyroRate = gyro.gyroADCf[axis]; // Process variable from gyro output in deg/sec
         float errorRate = currentPidSetpoint - gyroRate; // r - y
+        if (axis != FD_YAW)
+        {
+            const float nonLinearBoost = butteredPIDboost(errorRate, stickWeight);
+            errorRate += nonLinearBoost;
+        }
 #if defined(USE_ACC)
         handleCrashRecovery(
             pidProfile->crash_recovery, angleTrim, axis, currentTimeUs, gyroRate,
@@ -1484,27 +1496,17 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
             // This is done to avoid DTerm spikes that occur with dynamically
             // calculated deltaT whenever another task causes the PID
             // loop execution to be delayed.
-            float delta = - (gyroRateDterm[axis] - previousGyroRateDterm[axis]) * pidFrequency;
+            float delta = - (gyroRateDterm[axis] - previousGyroRateDterm[axis]);
             if (axis != FD_YAW)
             {
-            	const float saveDelta = delta;
-                float deflection =  2.0f * getRcDeflectionAbs(axis);
-                if (deflection > 1.0f)
+                //const float d_boost = applyBandPassFilter(axis, delta);
+                if (d_weight > 0.0f && propwashFrequencyDetected())
                 {
-                	deflection = 1.0f;
-                }
-                const float weight = 1.0f - deflection;
-
-                const float nonLinearBoost = butteredPIDboost(errorRate, weight);
-            	delta *= nonLinearBoost;
-
-                const float d_boost = applyBandPassFilter(axis, savedDelta);
-                if (d_weight > 0.0f)
-                {
-
-                	delta += (d_boost * d_weight * weight);
+                	// linear amplification of the d-term in the propwash band
+                	delta += (delta * d_weight * stickWeight);
                 }
             }
+            delta *= pidFrequency;
 
 
 #if defined(USE_ACC)
